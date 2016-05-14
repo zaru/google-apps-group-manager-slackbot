@@ -2,10 +2,11 @@
 #   management google apps group
 #
 # Configuration:
-#   CLIENT_ID
-#   CLIENT_SECRET
-#   APIKEY
-#   REFRESH_TOKEN
+#   CODY_CLIENT_ID
+#   CODY_CLIENT_SECRET
+#   CODY_APIKEY
+#   CODY_REFRESH_TOKEN
+#   CODY_DOMAIN
 #
 # Commands:
 #   hubot lists - List all mailing lists
@@ -18,10 +19,11 @@
 module.exports = (robot) ->
   request = require('request')
   fs = require('fs')
+  domain = process.env.CODY_DOMAIN.replace(".", "\\.")
   google_api_get_request = (url, params, callback) ->
     access_token = get_access_token()
     qs = params
-    qs["key"] = process.env.APIKEY
+    qs["key"] = process.env.CODY_APIKEY
     options = {
       url: url,
       headers: {"Authorization": "Bearer " + access_token},
@@ -36,7 +38,7 @@ module.exports = (robot) ->
     )
   google_api_post_request = (url, params, callback) ->
     access_token = get_access_token()
-    qs = { key: process.env.APIKEY }
+    qs = { key: process.env.CODY_APIKEY }
     options = {
       url: url,
       headers: {"Authorization": "Bearer " + access_token, 'Content-type': 'application/json'},
@@ -56,14 +58,13 @@ module.exports = (robot) ->
   google_api_delete_request = (url, params, callback) ->
     access_token = get_access_token()
     qs = params
-    qs["key"] = process.env.APIKEY
+    qs["key"] = process.env.CODY_APIKEY
     options = {
       url: url,
       headers: {"Authorization": "Bearer " + access_token},
       qs: qs,
       json: true
     }
-    console.log(options)
     request.delete(options, (error, response, body) ->
       if !error && (response.statusCode == 200 || response.statusCode == 204)
         callback(body)
@@ -79,9 +80,9 @@ module.exports = (robot) ->
     options = {
       url: "https://www.googleapis.com/oauth2/v4/token",
       form: {
-        refresh_token: process.env.REFRESH_TOKEN,
-        client_id: process.env.CLIENT_ID,
-        client_secret: process.env.CLIENT_SECRET,
+        refresh_token: process.env.CODY_REFRESH_TOKEN,
+        client_id: process.env.CODY_CLIENT_ID,
+        client_secret: process.env.CODY_CLIENT_SECRET,
         grant_type: "refresh_token"
       },
       json: true
@@ -93,7 +94,7 @@ module.exports = (robot) ->
       else
         console.log('error: '+ response.statusCode)
     )
-  robot.respond /(\S+@basicinc\.jp)$/i, (msg) ->
+  robot.respond new RegExp("(\\S+#{domain})$", 'i'), (msg) ->
     url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(msg["match"][1].trim()) + '/members'
     google_api_get_request(url, {}, (data) ->
       output = ""
@@ -104,14 +105,14 @@ module.exports = (robot) ->
     )
   robot.respond /lists$/i, (msg) ->
     url = 'https://www.googleapis.com/admin/directory/v1/groups'
-    google_api_get_request(url, { domain: 'basicinc.jp' }, (data) ->
+    google_api_get_request(url, { domain: process.env.CODY_DOMAIN }, (data) ->
       output = ""
       data.groups.forEach((g) ->
         output += g.name + " / " + g.email + "\n"
       )
       msg.send output
     )
-  robot.respond /(\S+@basicinc\.jp)\s+add\s(\S+@.+\..+)$/i, (msg) ->
+  robot.respond new RegExp("(\\S+@#{domain})\\s+add\\s(\\S+@.+\\..+)$", 'i'), (msg) ->
     mailing_lists = msg["match"][1].trim()
     email = msg["match"][2].trim()
     url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(mailing_lists.trim()) + '/members'
@@ -121,7 +122,7 @@ module.exports = (robot) ->
       else
         msg.send 'Added!'
     )
-  robot.respond /(\S+@basicinc\.jp)\s+rm\s(\S+@.+\..+)$/i, (msg) ->
+  robot.respond new RegExp("(\\S+@#{domain})\\s+rm\\s(\\S+@.+\\..+)$", 'i'), (msg) ->
     mailing_lists = msg["match"][1].trim()
     email = msg["match"][2].trim()
     url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(mailing_lists.trim()) + '/members/' + encodeURIComponent(email.trim())
