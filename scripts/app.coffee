@@ -1,15 +1,36 @@
 module.exports = (robot) ->
   request = require('request')
+  fs = require('fs')
   google_api_request = (url, callback) ->
+    access_token = get_access_token()
     options = {
       url: url + '&key=' + process.env.APIKEY,
-      headers: {"Authorization": "Bearer " + process.env.ACCESS_TOKEN},
+      headers: {"Authorization": "Bearer " + access_token},
       json: true
     }
-    console.log(options)
     request.get(options, (error, response, body) ->
       if !error && response.statusCode == 200
         callback(body)
+      else
+        refresh_access_token(google_api_request, url, callback)
+    )
+  get_access_token = () ->
+    return fs.readFileSync('.access_token', 'utf8')
+  refresh_access_token = (callback, url, callback2) ->
+    options = {
+      url: "https://www.googleapis.com/oauth2/v4/token",
+      form: {
+        refresh_token: process.env.REFRESH_TOKEN,
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        grant_type: "refresh_token"
+      },
+      json: true
+    }
+    request.post(options, (error, response, body) ->
+      if !error && response.statusCode == 200
+        fs.writeFileSync('.access_token', body.access_token)
+        callback(url, callback2)
       else
         console.log('error: '+ response.statusCode)
     )
