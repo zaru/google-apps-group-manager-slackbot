@@ -20,24 +20,27 @@ module.exports = (robot) ->
   fs = require('fs')
   google_api_get_request = (url, params, callback) ->
     access_token = get_access_token()
-    params["key"] = process.env.APIKEY
+    qs = params
+    qs["key"] = process.env.APIKEY
     options = {
-      url: url + '&key=' + process.env.APIKEY,
+      url: url,
       headers: {"Authorization": "Bearer " + access_token},
-      qs: params,
+      qs: qs,
       json: true
     }
     request.get(options, (error, response, body) ->
       if !error && response.statusCode == 200
         callback(body)
       else
-        refresh_access_token(google_api_get_request, url, callback)
+        refresh_access_token(google_api_get_request, url, params, callback)
     )
   google_api_post_request = (url, params, callback) ->
     access_token = get_access_token()
+    qs = { key: process.env.APIKEY }
     options = {
       url: url + '&key=' + process.env.APIKEY,
       headers: {"Authorization": "Bearer " + access_token},
+      qs: qs
       form: params,
       json: true
     }
@@ -68,8 +71,8 @@ module.exports = (robot) ->
         console.log('error: '+ response.statusCode)
     )
   robot.respond /(\S+@basicinc\.jp)/i, (msg) ->
-    url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(msg["match"][1].trim()) + '/members?'
-    google_api_get_request(url, { domain: 'basicinc.jp' }, (data) ->
+    url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(msg["match"][1].trim()) + '/members'
+    google_api_get_request(url, {}, (data) ->
       output = ""
       data.members.forEach((g) ->
         output += g.email + "\n"
@@ -77,8 +80,8 @@ module.exports = (robot) ->
       msg.send output
     )
   robot.respond /lists$/i, (msg) ->
-    url = 'https://www.googleapis.com/admin/directory/v1/groups?'
-    google_api_get_request(url, {}, (data) ->
+    url = 'https://www.googleapis.com/admin/directory/v1/groups'
+    google_api_get_request(url, { domain: 'basicinc.jp' }, (data) ->
       output = ""
       data.groups.forEach((g) ->
         output += g.name + " / " + g.email + "\n"
