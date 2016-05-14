@@ -5,9 +5,9 @@ cody is GoogleApps Group (MailingLists) manager slack bot.
 ## Usage
 
 ```
-git clone https://github.com/zaru/google-apps-group-manager-slackbot.git
-cd google-apps-group-manager-slackbot
-HUBOT_SLACK_TOKEN=... ./bin/hubot -a slack
+$ git clone https://github.com/zaru/google-apps-group-manager-slackbot.git
+$ cd google-apps-group-manager-slackbot
+$ HUBOT_SLACK_TOKEN=... ./bin/hubot -a slack
 ```
 
 ### set env
@@ -41,4 +41,44 @@ REFRESH_TOKEN=...
 
 # The following command is not required. This is a sample.
 curl --data "refresh_token=$REFRESH_TOKEN" --data "client_id=$CLIENT_ID" --data "client_secret=$CLIENT_SECRET" --data "grant_type=refresh_token" https://www.googleapis.com/oauth2/v4/token
+```
+
+### User PM2
+
+PM2 is a production process manager for Node.js.
+
+```
+$ npm install pm2 -g
+```
+
+#### app.json
+
+```
+{
+    "apps":[
+        {
+            "name"             : "cody",
+            "args"             : ["-a", "slack"],
+            "script"           : "./bin/hubot",
+            "exec_mode"        : "fork",
+            "exec_interpreter" : "bash",
+            "autorestart"      : true,
+            "env": {
+                "NODE_ENV"           : "production",
+                "PORT"               : "8080",
+                "HUBOT_SLACK_TOKEN"  : "..."
+            }
+        }
+    ]
+}
+```
+
+```
+$ pm2 start app.json
+$ pm2 list
+┌──────────┬────┬──────┬──────┬────────┬─────────┬────────┬─────────────┬──────────┐
+│ App name │ id │ mode │ pid  │ status │ restart │ uptime │ memory      │ watching │
+├──────────┼────┼──────┼──────┼────────┼─────────┼────────┼─────────────┼──────────┤
+│ cody     │ 0  │ fork │ 2692 │ online │ 0       │ 2m     │ 85.441 MB   │ disabled │
+└──────────┴────┴──────┴──────┴────────┴─────────┴────────┴─────────────┴──────────┘
 ```
