@@ -1,3 +1,20 @@
+# Description:
+#   management google apps group
+#
+# Configuration:
+#   CLIENT_ID
+#   CLIENT_SECRET
+#   APIKEY
+#   REFRESH_TOKEN
+#
+# Commands:
+#   hubot lists - List all mailing lists
+#   hubot <mailing list> - Show mailing list registered e-mails
+#   hubot <mailing list> add <email> - Add e-mail to mailing list
+#   hubot <mailing list> rm <email> - Remove e-mail to mailing list
+#
+# Author:
+#   zaru
 module.exports = (robot) ->
   request = require('request')
   fs = require('fs')
