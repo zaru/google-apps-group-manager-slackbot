@@ -38,17 +38,40 @@ module.exports = (robot) ->
     access_token = get_access_token()
     qs = { key: process.env.APIKEY }
     options = {
-      url: url + '&key=' + process.env.APIKEY,
-      headers: {"Authorization": "Bearer " + access_token},
+      url: url,
+      headers: {"Authorization": "Bearer " + access_token, 'Content-type': 'application/json'},
       qs: qs
-      form: params,
+      body: params,
       json: true
     }
     request.post(options, (error, response, body) ->
       if !error && response.statusCode == 200
         callback(body)
       else
-        refresh_access_token(google_api_post_request, url, params, callback)
+        if response.statusCode == 409
+          callback(false)
+        else
+          refresh_access_token(google_api_post_request, url, params, callback)
+    )
+  google_api_delete_request = (url, params, callback) ->
+    access_token = get_access_token()
+    qs = params
+    qs["key"] = process.env.APIKEY
+    options = {
+      url: url,
+      headers: {"Authorization": "Bearer " + access_token},
+      qs: qs,
+      json: true
+    }
+    console.log(options)
+    request.delete(options, (error, response, body) ->
+      if !error && (response.statusCode == 200 || response.statusCode == 204)
+        callback(body)
+      else
+        if response.statusCode == 404
+          callback(false)
+        else
+          refresh_access_token(google_api_get_request, url, params, callback)
     )
   get_access_token = () ->
     return fs.readFileSync('.access_token', 'utf8')
@@ -70,7 +93,7 @@ module.exports = (robot) ->
       else
         console.log('error: '+ response.statusCode)
     )
-  robot.respond /(\S+@basicinc\.jp)/i, (msg) ->
+  robot.respond /(\S+@basicinc\.jp)$/i, (msg) ->
     url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(msg["match"][1].trim()) + '/members'
     google_api_get_request(url, {}, (data) ->
       output = ""
@@ -87,4 +110,24 @@ module.exports = (robot) ->
         output += g.name + " / " + g.email + "\n"
       )
       msg.send output
+    )
+  robot.respond /(\S+@basicinc\.jp)\s+add\s(\S+@.+\..+)$/i, (msg) ->
+    mailing_lists = msg["match"][1].trim()
+    email = msg["match"][2].trim()
+    url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(mailing_lists.trim()) + '/members'
+    google_api_post_request(url, { email: email, role: 'MEMBER' }, (data) ->
+      if false == data
+        msg.send 'Member already exists.'
+      else
+        msg.send 'Added!'
+    )
+  robot.respond /(\S+@basicinc\.jp)\s+rm\s(\S+@.+\..+)$/i, (msg) ->
+    mailing_lists = msg["match"][1].trim()
+    email = msg["match"][2].trim()
+    url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(mailing_lists.trim()) + '/members/' + encodeURIComponent(email.trim())
+    google_api_delete_request(url, {}, (data) ->
+      if false == data
+        msg.send 'Member not exists.'
+      else
+        msg.send 'Removed!'
     )
