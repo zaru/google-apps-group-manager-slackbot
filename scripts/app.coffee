@@ -18,22 +18,38 @@
 module.exports = (robot) ->
   request = require('request')
   fs = require('fs')
-  google_api_request = (url, callback) ->
+  google_api_get_request = (url, params, callback) ->
     access_token = get_access_token()
+    params["key"] = process.env.APIKEY
     options = {
       url: url + '&key=' + process.env.APIKEY,
       headers: {"Authorization": "Bearer " + access_token},
+      qs: params,
       json: true
     }
     request.get(options, (error, response, body) ->
       if !error && response.statusCode == 200
         callback(body)
       else
-        refresh_access_token(google_api_request, url, callback)
+        refresh_access_token(google_api_get_request, url, callback)
+    )
+  google_api_post_request = (url, params, callback) ->
+    access_token = get_access_token()
+    options = {
+      url: url + '&key=' + process.env.APIKEY,
+      headers: {"Authorization": "Bearer " + access_token},
+      form: params,
+      json: true
+    }
+    request.post(options, (error, response, body) ->
+      if !error && response.statusCode == 200
+        callback(body)
+      else
+        refresh_access_token(google_api_post_request, url, params, callback)
     )
   get_access_token = () ->
     return fs.readFileSync('.access_token', 'utf8')
-  refresh_access_token = (callback, url, callback2) ->
+  refresh_access_token = (callback, url, params, callback2) ->
     options = {
       url: "https://www.googleapis.com/oauth2/v4/token",
       form: {
@@ -47,13 +63,13 @@ module.exports = (robot) ->
     request.post(options, (error, response, body) ->
       if !error && response.statusCode == 200
         fs.writeFileSync('.access_token', body.access_token)
-        callback(url, callback2)
+        callback(url, params, callback2)
       else
         console.log('error: '+ response.statusCode)
     )
-  robot.respond /members (.+@basicinc\.jp)/i, (msg) ->
+  robot.respond /(\S+@basicinc\.jp)/i, (msg) ->
     url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(msg["match"][1].trim()) + '/members?'
-    google_api_request(url, (data) ->
+    google_api_get_request(url, { domain: 'basicinc.jp' }, (data) ->
       output = ""
       data.members.forEach((g) ->
         output += g.email + "\n"
@@ -61,8 +77,8 @@ module.exports = (robot) ->
       msg.send output
     )
   robot.respond /lists$/i, (msg) ->
-    url = 'https://www.googleapis.com/admin/directory/v1/groups?domain=basicinc.jp'
-    google_api_request(url, (data) ->
+    url = 'https://www.googleapis.com/admin/directory/v1/groups?'
+    google_api_get_request(url, {}, (data) ->
       output = ""
       data.groups.forEach((g) ->
         output += g.name + " / " + g.email + "\n"
