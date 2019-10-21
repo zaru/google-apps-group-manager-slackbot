@@ -75,7 +75,7 @@ module.exports = (robot) ->
           refresh_access_token(google_api_get_request, url, params, callback)
     )
   get_access_token = () ->
-    return fs.readFileSync('.access_token', 'utf8')
+    return process.env.CODY_GSUITE_ACCESS_TOKEN
   refresh_access_token = (callback, url, params, callback2) ->
     options = {
       url: "https://www.googleapis.com/oauth2/v4/token",
