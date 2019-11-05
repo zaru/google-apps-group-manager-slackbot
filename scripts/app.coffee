@@ -18,90 +18,19 @@
 #   zaru
 module.exports = (robot) ->
   request = require('request')
-  fs = require('fs')
   domain = process.env.CODY_DOMAIN.replace(".", "\\.")
-  google_api_get_request = (url, params, callback) ->
-    access_token = get_access_token()
-    qs = params
-    qs["key"] = process.env.CODY_APIKEY
-    options = {
-      url: url,
-      headers: {"Authorization": "Bearer " + access_token},
-      qs: qs,
-      json: true
-    }
-    request.get(options, (error, response, body) ->
-      if !error && response.statusCode == 200
-        callback(body)
-      else
-        refresh_access_token(google_api_get_request, url, params, callback)
-    )
-  google_api_post_request = (url, params, callback) ->
-    access_token = get_access_token()
-    qs = { key: process.env.CODY_APIKEY }
-    options = {
-      url: url,
-      headers: {"Authorization": "Bearer " + access_token, 'Content-type': 'application/json'},
-      qs: qs
-      body: params,
-      json: true
-    }
-    request.post(options, (error, response, body) ->
-      if !error && response.statusCode == 200
-        callback(body)
-      else
-        if response.statusCode == 409
-          callback(false)
-        else
-          refresh_access_token(google_api_post_request, url, params, callback)
-    )
-  google_api_delete_request = (url, params, callback) ->
-    access_token = get_access_token()
-    qs = params
-    qs["key"] = process.env.CODY_APIKEY
-    options = {
-      url: url,
-      headers: {"Authorization": "Bearer " + access_token},
-      qs: qs,
-      json: true
-    }
-    request.delete(options, (error, response, body) ->
-      if !error && (response.statusCode == 200 || response.statusCode == 204)
-        callback(body)
-      else
-        if response.statusCode == 404
-          callback(false)
-        else
-          refresh_access_token(google_api_get_request, url, params, callback)
-    )
-  get_access_token = () ->
-    return process.env.CODY_GSUITE_ACCESS_TOKEN
-  refresh_access_token = (callback, url, params, callback2) ->
-    options = {
-      url: "https://www.googleapis.com/oauth2/v4/token",
-      form: {
-        refresh_token: process.env.CODY_REFRESH_TOKEN,
-        client_id: process.env.CODY_CLIENT_ID,
-        client_secret: process.env.CODY_CLIENT_SECRET,
-        grant_type: "refresh_token"
-      },
-      json: true
-    }
-    request.post(options, (error, response, body) ->
-      if !error && response.statusCode == 200
-        fs.writeFileSync('.access_token', body.access_token)
-        callback(url, params, callback2)
-      else
-        console.log('error: '+ response.statusCode)
-    )
+
   robot.respond new RegExp("(\\S+#{domain})$", 'i'), (msg) ->
     url = 'https://www.googleapis.com/admin/directory/v1/groups/' + encodeURIComponent(msg["match"][1].trim()) + '/members'
     google_api_get_request(url, {}, (data) ->
-      output = ""
-      data.members.forEach((g) ->
-        output += g.email + "\n"
-      )
-      msg.send output
+      if false == data
+        msg.send 'This is not mailing list. Please try `cody lists` command.'
+      else
+        output = ""
+        data.members.forEach((g) ->
+          output += g.email + "\n"
+        )
+        msg.send output
     )
   robot.respond /lists$/i, (msg) ->
     url = 'https://www.googleapis.com/admin/directory/v1/groups'
@@ -131,4 +60,79 @@ module.exports = (robot) ->
         msg.send 'Member not exists.'
       else
         msg.send 'Removed!'
+    )
+
+  google_api_get_request = (url, params, callback) ->
+    access_token = get_access_token()
+    qs = params
+    qs["key"] = process.env.CODY_APIKEY
+    options = {
+      url: url,
+      headers: {"Authorization": "Bearer " + access_token},
+      qs: qs,
+      json: true
+    }
+    request.get(options, (error, response, body) ->
+      if response.statusCode == 401
+        refresh_access_token(google_api_get_request, url, params, callback)
+      else if response.statusCode == 200
+        callback(body)
+      else
+        callback(false)
+    )
+  google_api_post_request = (url, params, callback) ->
+    access_token = get_access_token()
+    qs = { key: process.env.CODY_APIKEY }
+    options = {
+      url: url,
+      headers: {"Authorization": "Bearer " + access_token, 'Content-type': 'application/json'},
+      qs: qs
+      body: params,
+      json: true
+    }
+    request.post(options, (error, response, body) ->
+      if response.statusCode == 401
+        refresh_access_token(google_api_post_request, url, params, callback)
+      else if response.statusCode == 200
+        callback(body)
+      else
+        callback(false)
+    )
+  google_api_delete_request = (url, params, callback) ->
+    access_token = get_access_token()
+    qs = params
+    qs["key"] = process.env.CODY_APIKEY
+    options = {
+      url: url,
+      headers: {"Authorization": "Bearer " + access_token},
+      qs: qs,
+      json: true
+    }
+    request.delete(options, (error, response, body) ->
+      if response.statusCode == 401
+        refresh_access_token(google_api_get_request, url, params, callback)
+      else if response.statusCode == 200 || response.statusCode == 204
+        callback(body)
+      else
+        callback(false)
+    )
+  get_access_token = () ->
+    return process.env.CODY_GSUITE_ACCESS_TOKEN
+  refresh_access_token = (callback, url, params, callback2) ->
+    options = {
+      url: "https://www.googleapis.com/oauth2/v4/token",
+      form: {
+        refresh_token: process.env.CODY_REFRESH_TOKEN,
+        client_id: process.env.CODY_CLIENT_ID,
+        client_secret: process.env.CODY_CLIENT_SECRET,
+        grant_type: "refresh_token"
+      },
+      json: true
+    }
+    request.post(options, (error, response, body) ->
+      if !error && response.statusCode == 200
+        process.env.CODY_GSUITE_ACCESS_TOKEN = body.access_token
+        callback(url, params, callback2)
+      else
+        console.log('error: '+ response.statusCode)
     )
